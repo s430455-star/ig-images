@@ -206,3 +206,10 @@ HQ_VARIANT=tower200p ../../.venv-blender/bin/python integrations/export_campus_s
 ```bash
 HQ_VARIANT=tower110 ../../.venv-blender/bin/python integrations/export_campus_slices.py <輸出資料夾>
 ```
+
+## 150 m 園區版本（HQ_VARIANT=tower150，園區頁面目前使用）
+
+30 層 × 3 m（主體 90 m）＋通訊尖塔 60 m＝總高 150 m，每層樓地板 100 坪。部門在 1F–10F，11F–30F 為固定上部塔身。
+園區頁面室內改為依 100 坪樓層平均分配、滿版：index.html 新增 `IW/ID`（室內配置尺寸）與 `IFX/IFZ`（分散係數），
+靠牆家具（檔案櫃、茶水間、白板、影印機、主管辦公室、電梯廳）貼齊新樓層邊緣，辦公桌、資源台與各部門特色區平均分散，
+員工走動網格（hq-life.js）也改用新尺寸；家具與人物大小維持 3 m 樓層比例（60%）。
