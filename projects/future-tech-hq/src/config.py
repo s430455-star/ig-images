@@ -1,19 +1,28 @@
 """FUTURE TECHNOLOGY HEADQUARTERS — 正式建築尺寸與造型參數（單位：公尺，Z 軸朝上，正面朝 -Y）。
 
-正式規格（不可擅自修改）：
-  主體 10 層、主體高度 50 m（每層 5 m）
-  通訊尖塔自身高度 68 m（自主體屋頂 z=50 向上延伸）
-  地面至尖塔頂端總高度 118 m
+兩種版本（以環境變數 HQ_VARIANT 選擇）：
+  預設（正式規格，不可擅自修改）：
+    主體 10 層、主體高度 50 m（每層 5 m）；通訊尖塔 68 m；總高 118 m
+  HQ_VARIANT=tower500（阿川的園區專案版本）：
+    主體 10 層、每層 21.2 m、主體 212 m；尖塔 288 m；總高 500 m；
+    每層樓地板固定 100 坪（330.58 m²），塔身上下等寬
 """
 import math
+import os
+
+VARIANT = os.environ.get("HQ_VARIANT", "default")
+PING = 3.305785                    # 1 坪 = 3.305785 m²
 
 # ---------------------------------------------------------------- 正式尺寸
 FLOORS = 10
-FLOOR_H = 5.0
-BODY_H = FLOORS * FLOOR_H          # 50.0  主體屋頂結構面
-SPIRE_H = 68.0                     # 尖塔自身高度
-TOTAL_H = BODY_H + SPIRE_H         # 118.0 地面至尖塔頂
-assert abs(BODY_H - 50.0) < 1e-9 and abs(TOTAL_H - 118.0) < 1e-9
+FLOOR_H = 21.2 if VARIANT == "tower500" else 5.0
+BODY_H = FLOORS * FLOOR_H          # 50.0 / 212.0  主體屋頂結構面
+SPIRE_H = 288.0 if VARIANT == "tower500" else 68.0
+TOTAL_H = BODY_H + SPIRE_H         # 118.0 / 500.0 地面至尖塔頂
+if VARIANT == "tower500":
+    assert abs(TOTAL_H - 500.0) < 1e-9
+else:
+    assert abs(BODY_H - 50.0) < 1e-9 and abs(TOTAL_H - 118.0) < 1e-9
 
 # ---------------------------------------------------------------- 基座
 SITE_HALF = 38.0                   # 方形鋪面基地半寬
@@ -25,6 +34,12 @@ PODIUM_TOP = 1.0                   # 基座頂（大廳地坪）
 PLAN_A0, PLAN_B0 = 15.0, 12.0      # z=0 半軸（寬 30 m × 深 24 m）
 PLAN_A1, PLAN_B1 = 11.0, 9.0       # z=50 半軸（寬 22 m × 深 18 m）
 PLAN_N = 3.0                       # 超橢圓指數（>2 = 圓角矩形）
+if VARIANT == "tower500":
+    # 超橢圓面積 = 4ab·Γ(1+1/n)²/Γ(1+2/n)；n=3、a/b=1.25 → 每層 100 坪
+    _k_area = 4 * math.gamma(1 + 1 / PLAN_N) ** 2 / math.gamma(1 + 2 / PLAN_N)
+    _b = math.sqrt(100 * PING / (_k_area * 1.25))
+    PLAN_A0 = PLAN_A1 = 1.25 * _b      # ≈ 10.82 m（寬 21.6 m）
+    PLAN_B0 = PLAN_B1 = _b             # ≈ 8.65 m（深 17.3 m）
 
 SLAB_EDGE = 0.55                   # 樓板外緣突出玻璃面
 SLAB_T = 0.6
@@ -34,7 +49,7 @@ COLUMN_EVERY = 7                   # 每 N 支窗框設一支結構柱
 
 # ---------------------------------------------------------------- 白色螺旋外骨骼
 RIB_Z0 = PODIUM_TOP                # 起點：基座頂
-RIB_Z1 = 51.0                      # 終點：屋頂冠環
+RIB_Z1 = BODY_H + 1.0              # 終點：屋頂冠環
 RIB_TURNS = 0.75                   # 每條螺旋繞行圈數
 RIB_WIDTH = 2.9                    # 帶寬
 RIB_THICK = 0.8                    # 實際截面厚度
@@ -43,6 +58,12 @@ RIB_OFF_BASE = 3.2                 # 底部額外外擴
 RIB_BULGE = 3.8                   # 中下段外鼓
 RIB_SPLIT = 0.78                   # 交錯處內外層分離（± 公尺）
 RIB_SAMPLES = 420
+RIB_TAPER_W = 0.09                 # 兩端內外層分離的收斂長度（比例）
+if VARIANT == "tower500":
+    RIB_TURNS, RIB_WIDTH, RIB_THICK = 2.25, 4.2, 1.1
+    RIB_OFF_TOP, RIB_OFF_BASE, RIB_BULGE, RIB_SPLIT = 2.6, 4.0, 5.0, 1.1
+    RIB_SAMPLES = 1600
+    RIB_TAPER_W = 0.012
 # 4 條螺旋：兩條順時針、兩條逆時針；第一組在正面 (θ=-90°) 中段交叉
 _k = RIB_TURNS * 360.0
 _tc = 0.5
@@ -55,27 +76,35 @@ RIBBONS = [
 ]
 
 # ---------------------------------------------------------------- 屋頂冠部
-CROWN_Z = 50.0
+CROWN_Z = BODY_H
 DRUM_A, DRUM_B = 7.6, 6.6
-DRUM_TOP = 55.0
+DRUM_TOP = BODY_H + 5.0
 DECK_A, DECK_B = 9.6, 8.6
 DECK_T = 0.6
 SPIRE_BASE_Z = DRUM_TOP + DECK_T   # 55.6 尖塔框架落點
 
-# ---------------------------------------------------------------- 通訊尖塔（自 z=50 起算 68 m）
-SPIRE_TOP_Z = TOTAL_H              # 118.0
+# ---------------------------------------------------------------- 通訊尖塔（自屋頂起算 SPIRE_H）
+SPIRE_SK = SPIRE_H / 68.0          # 高度比例（預設 1）
+SPIRE_SW = 1.5 if VARIANT == "tower500" else 1.0   # 桁架寬度比例
+SPIRE_TOP_Z = TOTAL_H              # 118.0 / 500.0
 SPIRE_FOOT_HW = 6.0                # 尖塔底部框架半寬
-SPIRE_WAIST_Z = 68.0
-SPIRE_WAIST_HW = 2.4
-SPIRE_MAST_TOP_Z = 106.0
-SPIRE_MAST_TOP_HW = 0.7
-SPIRE_POLE_TOP_Z = 116.4
+SPIRE_WAIST_Z = BODY_H + 18.0 * SPIRE_SK
+SPIRE_WAIST_HW = 2.4 * SPIRE_SW
+SPIRE_MAST_TOP_Z = BODY_H + 56.0 * SPIRE_SK
+SPIRE_MAST_TOP_HW = 0.7 * SPIRE_SW
+SPIRE_POLE_TOP_Z = BODY_H + 66.4 * SPIRE_SK
+SPIRE_NSEC_BASE = 8 if VARIANT == "tower500" else 4
+SPIRE_NSEC_MAST = 36 if VARIANT == "tower500" else 12
 SPIRE_RINGS = [  # (z, 外半徑, 天線板數)
-    (68.0, 6.4, 20),
-    (79.5, 4.8, 16),
-    (90.5, 3.5, 14),
-    (99.5, 2.5, 10),
+    (BODY_H + 18.0 * SPIRE_SK, 6.4 * SPIRE_SW, 20),
+    (BODY_H + 29.5 * SPIRE_SK, 4.8 * SPIRE_SW, 16),
+    (BODY_H + 40.5 * SPIRE_SK, 3.5 * SPIRE_SW, 14),
+    (BODY_H + 49.5 * SPIRE_SK, 2.5 * SPIRE_SW, 10),
 ]
+
+# ---------------------------------------------------------------- 斜向落地支撐腳的頂點
+LEG_TOP_Z = FLOOR_H if VARIANT == "tower500" else 10.0
+LEG_MID_Z = FLOOR_H / 2 if VARIANT == "tower500" else 5.0
 
 
 def lerp(a, b, t):

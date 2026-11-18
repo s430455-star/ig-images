@@ -72,7 +72,8 @@ def ribbon_frame(theta0_deg, direction, n=C.RIB_SAMPLES):
     th = math.radians(theta0_deg) + direction * C.RIB_TURNS * TAU * t
     off = (C.RIB_OFF_TOP + C.RIB_OFF_BASE * (1 - t) ** 2
            + C.RIB_BULGE * np.sin(math.pi * t ** 0.8))
-    taper = 0.2 + 0.8 * smoothstep((t - 0.03) / 0.09) * smoothstep((0.97 - t) / 0.09)
+    w = C.RIB_TAPER_W
+    taper = 0.2 + 0.8 * smoothstep((t - w / 3) / w) * smoothstep((1 - w / 3 - t) / w)
     split = direction * C.RIB_SPLIT * taper
     R = np.array([C.facade_r(a, min(zz, C.BODY_H)) for a, zz in zip(th, z)])
     rr = R + off + split
@@ -170,7 +171,7 @@ def build_base_legs(col, rib):
         if abs(((a + math.pi / 2 + math.pi) % TAU) - math.pi) < 0.45:
             continue  # 正面入口
         foot = np.array([math.cos(a), math.sin(a), 0]) * (C.PODIUM_STEP_R - 1.2) + [0, 0, C.PODIUM_TOP]
-        top = facade_point(a, 10.0, C.SLAB_EDGE)
+        top = facade_point(a, C.LEG_TOP_Z, C.SLAB_EDGE)
         if seg_point_dist(foot, top, pts) < C.RIB_WIDTH / 2 + 0.9:
             continue
         if any(abs(((a - b + math.pi) % TAU) - math.pi) < TAU / 13 for b in chosen):
@@ -178,7 +179,7 @@ def build_base_legs(col, rib):
         chosen.append(a)
         legs.tube(foot, top, 0.42, 0.30, seg=20)
         # 第二支輔助斜撐（A 字形）
-        top2 = facade_point(a, 5.0, C.SLAB_EDGE)
+        top2 = facade_point(a, C.LEG_MID_Z, C.SLAB_EDGE if C.LEG_MID_Z % C.FLOOR_H < 1e-6 else 0.32)
         mid = foot + 0.45 * (top - foot)
         legs.tube(mid, top2, 0.18, seg=12)
         nodes.sphere(top, 0.55)
@@ -191,6 +192,20 @@ def build_base_legs(col, rib):
 
 
 # ================================================================ A. main building
+def louver_levels():
+    """樓層中段水平遮陽板高度：每層 n 等分（5 m 樓層 → 中段 1 道；21.2 m 樓層 → 每 3.5 m 1 道）。"""
+    n = max(2, 2 * round(C.FLOOR_H / 8.4))
+    k0 = 0 if C.VARIANT == "tower500" else 1
+    return [k * C.FLOOR_H + j * C.FLOOR_H / n for k in range(k0, C.FLOORS) for j in range(1, n)]
+
+
+def strut_levels():
+    """外骨骼支撐的落點：(高度, 距玻璃面)。每層樓板；樓層很高時加上樓層中段遮陽板。"""
+    lv = [(k * C.FLOOR_H, C.SLAB_EDGE) for k in range(1, C.FLOORS)]
+    if C.FLOOR_H > 8:
+        lv += [(k * C.FLOOR_H + C.FLOOR_H / 2, 0.32) for k in range(0, C.FLOORS)]
+    return sorted(lv)
+
 def fin_thetas(n):
     th = np.linspace(0, TAU, 4000, endpoint=False)
     P = np.array([facade_point(t, 25.0) for t in th])
@@ -215,7 +230,7 @@ def build_main(col):
     edges.to_object(MAT.get("metal"), col)
 
     # 玻璃帷幕（實體厚度 6 cm）：大廳層透明、2–10F 藍灰
-    rows = [outline(z, 0.0) for z in np.linspace(C.FLOOR_H, C.BODY_H, 46)]
+    rows = [outline(z, 0.0) for z in np.linspace(C.FLOOR_H, C.BODY_H, max(46, int(C.BODY_H / 1.1)))]
     g = MeshBuilder("Main_Glass_Curtain_Wall")
     g.grid_surface(np.array(rows))
     g.to_object(MAT.get("glass"), col, solidify=0.06)
@@ -242,8 +257,7 @@ def build_main(col):
 
     # 水平分隔：樓層中段遮陽板＋玻璃橫框
     hz = MeshBuilder("Main_Horizontal_Louvers")
-    for k in range(1, C.FLOORS):
-        z = k * C.FLOOR_H + 2.5
+    for z in louver_levels():
         hz.ring_prism(outline(z, 0.32), outline(z, 0.02), z - 0.04, z + 0.04)
     hz.to_object(MAT.get("metal"), col)
 
@@ -291,16 +305,16 @@ def build_exoskeleton(col, rib):
     kept = skipped = 0
     for name, r in rib.items():
         others = np.vstack([p for n, p in allpts.items() if n != name])
-        for k in range(1, C.FLOORS):
-            zf = k * C.FLOOR_H
+        lv = strut_levels()
+        for li, (zf, ext) in enumerate(lv):
             i = int(np.argmin(np.abs(r["z"] - zf)))
             P, N, th = r["P"][i], r["N"][i], r["theta"][i]
             inner = P - N * (C.RIB_THICK / 2)
-            target = facade_point(th, zf, C.SLAB_EDGE)
+            target = facade_point(th, zf, ext)
             cand = [(inner, target, 0.17)]
-            if k >= 2:
+            if li >= 1:
                 th2 = th - r["dir"] * 0.13
-                cand.append((inner, facade_point(th2, zf - C.FLOOR_H, C.SLAB_EDGE), 0.12))
+                cand.append((inner, facade_point(th2, lv[li - 1][0], lv[li - 1][1]), 0.12))
             for a, b, rad in cand:
                 if seg_point_dist(a, b, others) < C.RIB_WIDTH / 2 + 0.45:
                     skipped += 1
@@ -414,25 +428,29 @@ def build_roof_and_spire(col_roof, col_spire):
     ant.to_object(MAT.get("metal"), col_roof)
 
     # --- 尖塔
+    SW, SK = C.SPIRE_SW, C.SPIRE_SK
+    PL = C.SPIRE_POLE_TOP_Z - C.SPIRE_MAST_TOP_Z
     legs = MeshBuilder("Spire_Lattice_Legs")
     braces = MeshBuilder("Spire_Bracing")
     z0 = C.SPIRE_BASE_Z
     hw_base = lattice(legs, braces, z0, C.SPIRE_FOOT_HW, C.SPIRE_WAIST_Z, C.SPIRE_WAIST_HW,
-                      4, 0.48, 0.34, 0.10)
+                      C.SPIRE_NSEC_BASE, 0.48 * SW, 0.34 * SW, 0.10 * SW)
     hw_mast = lattice(legs, braces, C.SPIRE_WAIST_Z, C.SPIRE_WAIST_HW, C.SPIRE_MAST_TOP_Z,
-                      C.SPIRE_MAST_TOP_HW, 12, 0.32, 0.16, 0.065)
+                      C.SPIRE_MAST_TOP_HW, C.SPIRE_NSEC_MAST, 0.32 * SW, 0.16 * SW, 0.065 * SW)
 
     def hw(z):
         return hw_base(z) if z <= C.SPIRE_WAIST_Z else hw_mast(z)
 
     # 中央垂直主桿＋四向垂直支柱
     pole = MeshBuilder("Spire_Main_Pole")
-    pole.tube((0, 0, zb), (0, 0, C.SPIRE_MAST_TOP_Z), 0.65, 0.4, seg=24)
-    pole.tube((0, 0, C.SPIRE_MAST_TOP_Z), (0, 0, C.SPIRE_POLE_TOP_Z), 0.42, 0.16, seg=20)
+    pole.tube((0, 0, zb), (0, 0, C.SPIRE_MAST_TOP_Z), 0.65 * SW, 0.4 * SW, seg=24)
+    pole.tube((0, 0, C.SPIRE_MAST_TOP_Z), (0, 0, C.SPIRE_POLE_TOP_Z), 0.42 * SW, 0.16 * SW, seg=20)
     pole.tube((0, 0, C.SPIRE_POLE_TOP_Z), (0, 0, C.SPIRE_TOP_Z), 0.07, 0.025, seg=10)
-    for zc in (C.SPIRE_MAST_TOP_Z, C.SPIRE_MAST_TOP_Z + 3.5, C.SPIRE_MAST_TOP_Z + 7.0):
-        pole.tube((0, 0, zc - 0.3), (0, 0, zc + 0.3), 0.75 - (zc - C.SPIRE_MAST_TOP_Z) * 0.05, seg=24)
-    for z, L in ((108.5, 3.0), (111.5, 2.2), (114.5, 1.5)):
+    for f in (0.0, 3.5 / 10.4, 7.0 / 10.4):
+        zc = C.SPIRE_MAST_TOP_Z + f * PL
+        pole.tube((0, 0, zc - 0.3 * SW), (0, 0, zc + 0.3 * SW), (0.75 - f * 10.4 * 0.05) * SW, seg=24)
+    for f, L in ((2.5 / 10.4, 3.0 * SW), (5.5 / 10.4, 2.2 * SW), (8.5 / 10.4, 1.5 * SW)):
+        z = C.SPIRE_MAST_TOP_Z + f * PL
         pole.tube((-L, 0, z), (L, 0, z), 0.05, seg=8)
         pole.tube((0, -L, z), (0, L, z), 0.05, seg=8)
         for s in (-1, 1):
@@ -475,15 +493,15 @@ def build_roof_and_spire(col_roof, col_spire):
             d = np.array([math.cos(a), math.sin(a), 0])
             tg = np.array([-math.sin(a), math.cos(a), 0])
             c = d * (ro + 0.55) + [0, 0, z - 1.6]
-            panels.box(c, d, tg, (0, 0, 1), 0.2, 0.7, 2.6)
+            panels.box(c, d, tg, (0, 0, 1), 0.2 * SW, 0.7 * SW, 2.6 * SW)
             rings.tube(d * (ro + 0.2) + [0, 0, z - 0.8], d * (ro + 0.45) + [0, 0, z - 0.8], 0.05, seg=6)
             rings.tube(d * (ro + 0.2) + [0, 0, z - 2.4], d * (ro + 0.45) + [0, 0, z - 2.4], 0.05, seg=6)
     # 微波碟型天線
-    for z in (84.5, 95.0):
+    for z in (C.BODY_H + 34.5 * SK, C.BODY_H + 45.0 * SK):
         for a in (0.3, 2.4, 4.5):
             d = np.array([math.cos(a), math.sin(a), 0])
             base = d * (hw(z) * 1.25) + [0, 0, z]
-            panels.tube(base, base + d * 0.55, 0.75, seg=28)
+            panels.tube(base, base + d * 0.55 * SW, 0.75 * SW, seg=28)
             rings.tube(d * hw(z) * 0.9 + [0, 0, z], base, 0.08, seg=8)
     rings.to_object(MAT.get("metal"), col_spire)
     panels.to_object(MAT.get("white_ceramic"), col_spire)

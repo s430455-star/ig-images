@@ -139,3 +139,18 @@ cd projects/future-tech-hq && python3 -m http.server 8000
 - 參考圖為概念圖，本模型依確認規格（50 / 68 / 118 m）重建造型語言，非逐像素複製。
 - Three.js 展示頁的玻璃改用即時反射材質（不做即時折射），以維持瀏覽器效能；寫實折射效果請看 Cycles 渲染圖。
 - 結構柱為沿收窄立面傾斜的實體，柱頂角點比屋頂面高約 4 cm（報告中 `body_roof_level_m = 50.04`），屋頂結構面為 50.0 m。
+
+## 500 m 園區版本（HQ_VARIANT=tower500）
+
+給「未來科技總部大樓」園區頁面使用的版本：10 層、每層 21.2 m（主體 212 m）、通訊尖塔 288 m、總高 500 m，
+每層樓地板固定 100 坪（塔身上下等寬，21.6 × 17.3 m 圓角平面）。正式 118 m 版本的參數與產出完全不受影響。
+
+建模與檢查：
+```bash
+HQ_VARIANT=tower500 ../../.venv-blender/bin/python -c "import sys;sys.path.insert(0,'src');import bpy,build_model,validate;build_model.build();validate.run('variants/tower500/geometry_report.json')"
+```
+匯出 10 個樓層切片（給園區頁面的 `models/future-hq-500-a/b/c.gltf.json`）：
+```bash
+HQ_VARIANT=tower500 ../../.venv-blender/bin/python integrations/export_campus_slices.py <輸出資料夾>
+```
+園區頁面的整合程式：`integrations/hq-swap.js`（每個樓層切片掛在原本的樓層群組下，展開樓層時一起滑出）。

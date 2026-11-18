@@ -6,6 +6,8 @@
     "floors": 10,
     "floor_height_m": 5.0,
     "spec_ok": true,
+    "floor_area_ping_1F": 192.4,
+    "floor_area_ping_10F": 113.3,
     "plan_width_x_m_at_ground": 30.3,
     "plan_depth_y_m_at_ground": 24.5
   },

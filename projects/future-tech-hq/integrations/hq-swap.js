@@ -1,98 +1,87 @@
 /* =====================================================================
-   hq-swap.js — 主要大樓換成「FUTURE TECHNOLOGY HEADQUARTERS」Blender 模型
-   • 模型：models/future-hq.gltf.json（Blender Python 程式化建模，10 層／主體 50 m／尖塔 68 m）
-   • 比例：場景 1 單位 ≈ 1.67 m（每層 H=3），模型每層 5 m → 縮放 0.6，10 層剛好對齊原本 10 層
-   • 從外面看：顯示新大樓，隱藏原本程式產生的大樓外觀（樓板、玻璃、緞帶、屋頂尖塔）
-   • 走進某一層：自動切回原本的樓層，室內、員工、展開動畫完全照舊；離開後再換回新大樓
-   • 原本的玻璃仍保留在場景中（只是不畫出來），點大樓選樓層的功能不受影響
-   API：HQSWAP.on(true/false) 切換新舊外觀；HQSWAP.ready
+   hq-swap.js — v2 主要大樓：FUTURE TECHNOLOGY HEADQUARTERS 500 m 版
+   規格：10 層、每層 21.2 m（主體 212 m）、通訊尖塔 288 m、總高 500 m、每層樓地板 100 坪
+   • 模型：Blender Python 程式化建模，切成 10 個樓層切片（models/future-hq-500-a/b/c.gltf.json）
+   • 比例：場景 1 單位 ≈ 1.67 m → 縮放 0.6；index.html 的樓層高度 H 已改為 12.72（= 21.2 m）
+   • 每個樓層切片掛在原本的樓層群組底下，所以點樓層「展開」時，滑出來的就是新大樓那一層
+     （玻璃帷幕、窗框、結構柱、白色螺旋外骨骼都跟著出來），室內、員工、對話照舊
+   • 原本程式產生的大樓外觀全部隱藏；原本的玻璃保留但不畫出來，點大樓選樓層照常
+   • 「視角置中」改成看得到整棟 500 m 大樓；遠景霧依鏡頭距離自動調整
+   API：HQSWAP.ready / HQSWAP.home()
    ===================================================================== */
 (function(){
 'use strict';
-const S={ready:false,enabled:true,model:null};
-const SCALE=0.6, FILE='models/future-hq.gltf.json';
-// 原本園區已有入口廣場與道路，新模型的基座與入口門廳不放進來，保留斜撐腳與螺旋落地座
-const SKIP=/^(Base_Podium|Base_Metal_Trim|Base_Entrance_)/;
+const S={ready:false,parts:0};
+const SCALE=0.6, FILES=['models/future-hq-500-a.gltf.json','models/future-hq-500-b.gltf.json','models/future-hq-500-c.gltf.json'];
+const SKIP=/^(Base_Podium|Base_Metal_Trim|Base_Entrance_)/;         // 園區已有入口廣場
+const HOME_NEW={t:[0,148,0],c:[290,165,388]};                         // 看得到整棟（總高 300 單位）
 const wait=f=>{const c=window.__ct;if(c&&c.scene&&c.camera&&window.THREE&&THREE.GLTFLoader)f(c);else setTimeout(()=>wait(f),400);};
-let towerParts=null,saved=new Map(),mode=null,glassMats=[],ribbonMats=[];
-// 白色外骨骼：白天壓低亮度（避開場景光暈門檻），夜晚恢復亮白
+let haze=null,floors=[],roof=null,H=12.72,N=10,oldRoofKids=[],ribbonMats=[],glassAll=[],floorSlices={},base=null;
 const RIB_DAY=new THREE.Color(0x8f98a3),RIB_NIGHT=new THREE.Color(0xd3d9e0);
-// 「視角置中」改成看得到整棟新大樓（含 68 m 尖塔，總高約 71 單位）
-const HOME_NEW={t:[0,34,0],c:[63,50,84]};
-const KEY='hq-swap-on';
-try{const v=localStorage.getItem(KEY);if(v==='0')S.enabled=false;}catch(e){}
 
 function findTower(scene){
-  const floors=[],roofs=[];
   scene.children.forEach(o=>{const u=o.userData||{};
     if(o.isGroup&&u.glassMat&&u.im&&u.deco)floors.push(o);
-    else if(o.isGroup&&typeof u.baseY==='number'&&u.liftT!==undefined&&!u.glassMat)roofs.push(o);});
-  return {floors,roofs};
+    else if(o.isGroup&&typeof u.baseY==='number'&&u.liftT!==undefined&&!u.glassMat)roof=o;});
+  floors.sort((a,b)=>a.userData.baseY-b.userData.baseY);N=floors.length;
+  if(N>1)H=floors[1].userData.baseY-floors[0].userData.baseY;
+  if(roof)oldRoofKids=roof.children.slice();
 }
+/* 原本的大樓外觀：每一格都強制隱藏（玻璃只關掉繪製，保留點選） */
 function hideOld(){
-  towerParts.floors.forEach(g=>{const u=g.userData;g.children.forEach(c=>{
-      if(c.isMesh&&c.material===u.glassMat){u.glassMat.visible=false;return;}   // 保留點選用的玻璃
-      if(!saved.has(c))saved.set(c,c.visible);c.visible=false;});});
-  towerParts.roofs.forEach(r=>{if(!saved.has(r))saved.set(r,r.visible);r.visible=false;});
+  floors.forEach(g=>{const u=g.userData;g.children.forEach(c=>{
+    if(c.userData&&c.userData.hqNew)return;
+    if(c.isMesh&&c.material===u.glassMat){u.glassMat.visible=false;return;}
+    if(c===u.core||c===u.im||c===u.deco||c.isLineSegments||(c.isMesh&&!c.userData.keep))c.visible=false;});});
+  oldRoofKids.forEach(o=>{o.visible=false;});
 }
-function showOld(entered){
-  saved.forEach((v,o)=>{o.visible=v;});saved.clear();
-  towerParts.floors.forEach(g=>{g.userData.glassMat.visible=true;});
-  if(entered>=0){const fd=towerParts.floors.find(g=>Math.round(g.userData.baseY/3)===entered);
-    if(fd){const u=fd.userData;u.core.visible=false;u.im.visible=false;u.deco.visible=false;}}
-}
-function apply(c){
-  if(!towerParts||!S.model)return;
-  const inside=c.entered&&c.entered()>=0;
-  const want=S.enabled&&!inside?'new':'old';
-  if(want!==mode){
-    if(want==='new'){hideOld();S.model.visible=true;}
-    else{showOld(inside?c.entered():-1);S.model.visible=false;}
-    mode=want;
+function prepMesh(o,perFloor){
+  const T=THREE;o.raycast=()=>{};
+  if(SKIP.test(o.name.replace(/^F\d\d__/,''))){o.visible=false;return;}
+  if(!o.isMesh)return;
+  o.castShadow=true;o.receiveShadow=true;
+  const m=o.material;if(!m)return;
+  if(/Glass/.test(m.name||'')){
+    const lobby=/Lobby/.test(m.name);
+    const g=new T.MeshStandardMaterial({name:m.name,color:lobby?0xa9c3d3:0x24405a,metalness:.7,roughness:.05,transparent:true,
+      opacity:lobby?.35:.82,depthWrite:!lobby,envMapIntensity:1.7,emissive:new T.Color(0xffc56b),emissiveIntensity:0});
+    g.userData.base=g.opacity;o.material=g;o.castShadow=false;glassAll.push(g);if(perFloor)perFloor.glass.push(g);
+  }else if(/White_Ceramic/.test(m.name||'')){
+    m.roughness=.42;m.metalness=.2;if('clearcoat' in m)m.clearcoat=0;m.envMapIntensity=.55;if(!ribbonMats.includes(m))ribbonMats.push(m);
   }
+  if(perFloor&&/Main_Core$/.test(o.name))perFloor.core.push(o);
+  const mats=Array.isArray(o.material)?o.material:[o.material];
+  mats.forEach(mt=>{if(mt&&mt.isMeshStandardMaterial&&window.HQB&&HQB.addEnv)HQB.addEnv(mt);});
 }
-function prep(root){
-  const T=THREE;
-  root.traverse(o=>{
-    if(SKIP.test(o.name)){o.visible=false;return;}
-    o.raycast=()=>{};                                   // 不擋住原本大樓的點選
-    if(!o.isMesh)return;
-    o.castShadow=true;o.receiveShadow=true;
-    const m=o.material;if(!m)return;
-    if(/Glass/.test(m.name||'')){
-      const lobby=/Lobby/.test(m.name);
-      const g=new T.MeshStandardMaterial({name:m.name,color:lobby?0xa9c3d3:0x24405a,metalness:.7,roughness:.05,transparent:true,
-        opacity:lobby?.35:.82,depthWrite:!lobby,envMapIntensity:1.7,emissive:new T.Color(0xffc56b),emissiveIntensity:0});
-      o.material=g;o.castShadow=false;glassMats.push(g);m.dispose&&m.dispose();
+/* 把一個 glTF 節點掛到目標群組：目標在原點位置 (0,y0,0) 時，切片剛好落在大樓上的正確高度 */
+function mount(node,target,y0){
+  const w=new THREE.Group();w.userData.hqNew=true;w.scale.setScalar(SCALE);w.position.y=-y0;
+  w.add(node);target.add(w);return w;
+}
+function onPart(gltf,c){
+  const nodes=gltf.scene.children.slice();
+  nodes.forEach(n=>{
+    const m=/^F(\d\d)__/.exec(n.name);
+    if(m){const i=+m[1],g=floors[i];if(!g)return;
+      const pf=floorSlices[i]||(floorSlices[i]={glass:[],core:[]});
+      n.traverse(o=>prepMesh(o,pf));
+      // 每層的玻璃材質獨立一份，展開那一層時只讓那一層變透明
+      n.traverse(o=>{if(o.isMesh&&o.material&&/Glass/.test(o.material.name||'')){const cl=o.material.clone();cl.userData.base=o.material.userData.base;
+        pf.glass.splice(pf.glass.indexOf(o.material),1,cl);glassAll.push(cl);o.material=cl;}});
+      mount(n,g,i*H);
+    }else{
+      n.traverse(o=>prepMesh(o,null));
+      const top=/^(Spire_|Roof_)/.test(n.name);
+      if(top&&roof)mount(n,roof,N*H);
+      else{if(!base){base=new THREE.Group();base.name='future-hq-base';c.scene.add(base);}mount(n,base,0);}
     }
-    if(/White_Ceramic/.test((o.material&&o.material.name)||'')){   // 配合本場景的光暈與調色，白色外骨骼降一點亮度
-      const w=o.material;w.roughness=.42;w.metalness=.2;if('clearcoat' in w)w.clearcoat=0;w.envMapIntensity=.55;ribbonMats.push(w);}
-    const mats=Array.isArray(o.material)?o.material:[o.material];
-    mats.forEach(mt=>{if(mt&&mt.isMeshStandardMaterial&&window.HQB&&HQB.addEnv)HQB.addEnv(mt);});
   });
-  root.scale.setScalar(SCALE);
+  S.parts++;
 }
-wait(c=>{
-  towerParts=findTower(c.scene);
-  if(!towerParts.floors.length){console.warn('hq-swap: 找不到原本的大樓樓層，維持原樣');return;}
-  new THREE.GLTFLoader().load(FILE,g=>{
-    const root=g.scene;root.name='future-hq';prep(root);root.visible=false;
-    c.scene.add(root);S.model=root;S.ready=true;
-    const loop=()=>{apply(c);
-      const n=c.getNight?c.getNight():0;glassMats.forEach(m=>{m.emissiveIntensity=n*.14;});   // 夜晚室內燈光透出
-      ribbonMats.forEach(m=>m.color.copy(RIB_DAY).lerp(RIB_NIGHT,n));
-      requestAnimationFrame(loop);};
-    loop();
-    mountUI(c);
-    if(S.enabled&&!(c.entered&&c.entered()>=0))setTimeout(()=>flyHome(c),300);
-    if(window.HQSTILL&&HQSTILL.refresh)setTimeout(()=>HQSTILL.refresh(),500);
-  },undefined,e=>console.warn('hq-swap: 新大樓模型載入失敗，維持原本外觀',e));
-});
-let tw=null;
+let lastEntered=-2,tw=null;
 function flyHome(c){
-  if(!S.enabled&&window.HQVIEW&&HQVIEW.home){HQVIEW.home();return;}
   if(c.entered&&c.entered()>=0)c.exitFloor();
-  const from=c.camera.position.clone(),ft=c.controls.target.clone(),t0=performance.now(),dur=matchMedia('(prefers-reduced-motion: reduce)').matches?1:1400;
+  const from=c.camera.position.clone(),ft=c.controls.target.clone(),t0=performance.now(),dur=matchMedia('(prefers-reduced-motion: reduce)').matches?1:1600;
   const to=from.clone().set(...HOME_NEW.c),tt=ft.clone().set(...HOME_NEW.t);
   if(c.clearTrans)c.clearTrans();if(tw)cancelAnimationFrame(tw);
   const step=now=>{const u=Math.min(1,(now-t0)/dur),e=u<.5?2*u*u:1-Math.pow(-2*u+2,2)/2;
@@ -100,14 +89,41 @@ function flyHome(c){
     tw=u<1?requestAnimationFrame(step):null;};tw=requestAnimationFrame(step);}
 function mountUI(c){
   const tryMount=()=>{const home=document.getElementById('btnHome');if(!home){setTimeout(tryMount,400);return;}
-    home.onclick=()=>flyHome(c);home.title='回到看得到整棟大樓的視角';
-    if(document.getElementById('btnSwap'))return;
-    const b=document.createElement('button');b.className='btn';b.id='btnSwap';b.type='button';
-    const label=()=>{b.textContent=S.enabled?'外觀：新大樓':'外觀：原本大樓';b.setAttribute('aria-pressed',String(S.enabled));b.title='切換新、舊大樓外觀（會記住你的選擇）';};
-    b.onclick=()=>{S.on(!S.enabled);try{localStorage.setItem(KEY,S.enabled?'1':'0');}catch(e){}label();};
-    label();home.parentNode.insertBefore(b,home.nextSibling);};
+    home.onclick=()=>flyHome(c);home.title='回到看得到整棟 500 m 大樓的視角';};
   tryMount();}
-S.on=v=>{S.enabled=!!v;mode=null;};
+function loop(c){
+  hideOld();
+  const e=c.entered?c.entered():-1;
+  if(e!==lastEntered){
+    Object.keys(floorSlices).forEach(k=>{const pf=floorSlices[k],on=+k===e;
+      pf.core.forEach(o=>{o.visible=!on;});
+      pf.glass.forEach(m=>{m.opacity=on?.08:m.userData.base;m.depthWrite=!on&&m.userData.base>.5;});});
+    lastEntered=e;
+  }
+  const n=c.getNight?c.getNight():0;
+  glassAll.forEach(m=>{m.emissiveIntensity=n*.14;});
+  ribbonMats.forEach(m=>m.color.copy(RIB_DAY).lerp(RIB_NIGHT,n));
+  // 城市低空薄霧（高度 7、19）：鏡頭飛高往下看時會把整座城市蓋白，依鏡頭高度淡出
+  if(!haze){const sf=c.scene.getObjectByName('scifi');haze=[];if(sf)sf.traverse(o=>{const u=o.material&&o.material.uniforms;if(u&&u.uK&&u.uDay){haze.push([u.uK,u.uK.value]);}});}
+  const hk=Math.min(1,Math.max(0,1-(c.camera.position.y-40)/70));haze.forEach(([u,k])=>{u.value=k*hk;});
+  // 遠景霧：鏡頭拉遠看整棟時，霧跟著退遠
+  const f=c.scene.fog;if(f){const d=c.camera.position.distanceTo(c.controls.target);f.near=Math.max(95,d*.85);f.far=Math.max(210,d*2.4+250);}
+  if(c.camera.far<6000){c.camera.far=6000;c.camera.updateProjectionMatrix();}
+  requestAnimationFrame(()=>loop(c));
+}
+wait(c=>{
+  findTower(c.scene);
+  if(floors.length!==10){console.warn('hq-swap: 找不到 10 個樓層，維持原樣');return;}
+  const L=new THREE.GLTFLoader();let left=FILES.length;
+  FILES.forEach(fn=>L.load(fn,g=>{onPart(g,c);if(--left===0)done(c);},undefined,e=>{console.warn('hq-swap: 載入失敗',fn,e);if(--left===0)done(c);}));
+});
+function done(c){
+  S.ready=S.parts===FILES.length;
+  if(!S.parts)return;
+  loop(c);mountUI(c);
+  if(!(c.entered&&c.entered()>=0))setTimeout(()=>flyHome(c),300);
+  if(window.HQSTILL&&HQSTILL.refresh)setTimeout(()=>HQSTILL.refresh(),500);
+}
 S.home=()=>window.__ct&&flyHome(window.__ct);
 window.HQSWAP=S;
 })();

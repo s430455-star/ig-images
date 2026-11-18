@@ -57,9 +57,17 @@ def run(report_path=None):
         "floor_height_m": C.FLOOR_H,
         "spec_ok": bool(abs(zmax - C.TOTAL_H) < 0.05 and abs(body_top - C.BODY_H) < 0.05),
     }
+    th = np.linspace(0, 2 * math.pi, 2000, endpoint=False)
+    def floor_area(z):
+        a_, b_ = C.plan_axes(z)
+        r = np.array([C.superellipse_r(t, a_, b_) for t in th])
+        x, y = r * np.cos(th), r * np.sin(th)
+        return 0.5 * abs(np.dot(x, np.roll(y, -1)) - np.dot(y, np.roll(x, -1)))
+    R["dimensions"]["floor_area_ping_1F"] = round(floor_area(0.0) / C.PING, 1)
+    R["dimensions"]["floor_area_ping_10F"] = round(floor_area((C.FLOORS - 1) * C.FLOOR_H) / C.PING, 1)
     v = world_verts(bpy.data.objects["Main_Floor_Slab_Edges"])
-    R["dimensions"]["plan_width_x_m_at_ground"] = round(float(np.ptp(v[v[:, 2] < 6][:, 0])), 2)
-    R["dimensions"]["plan_depth_y_m_at_ground"] = round(float(np.ptp(v[v[:, 2] < 6][:, 1])), 2)
+    R["dimensions"]["plan_width_x_m_at_ground"] = round(float(np.ptp(v[v[:, 2] < C.FLOOR_H + 1][:, 0])), 2)
+    R["dimensions"]["plan_depth_y_m_at_ground"] = round(float(np.ptp(v[v[:, 2] < C.FLOOR_H + 1][:, 1])), 2)
 
     # 螺旋外骨骼與立面淨距（內側面到樓板外緣/結構柱）
     rib = all_ribbons()
