@@ -189,3 +189,12 @@ HQ_VARIANT=tower200 ../../.venv-blender/bin/python integrations/export_campus_sl
 ```bash
 HQ_VARIANT=tower80 ../../.venv-blender/bin/python integrations/export_campus_slices.py <輸出資料夾>
 ```
+
+## 200 m 等比例版本（HQ_VARIANT=tower200p，園區頁面目前使用）
+
+由 80 m 版本（主體 30 m：尖塔 50 m）等比例拉高到 200 m，維持每層 3 m：
+主體 25 層 × 3 m = 75 m＋通訊尖塔 125 m＝總高 200 m，每層樓地板 100 坪。螺旋外骨骼繞 1.1 圈。
+園區頁面：1F–10F 為可展開的部門樓層（獨立辦公室畫面），11F–25F 合成固定的上部塔身。
+```bash
+HQ_VARIANT=tower200p ../../.venv-blender/bin/python integrations/export_campus_slices.py <輸出資料夾>
+```
