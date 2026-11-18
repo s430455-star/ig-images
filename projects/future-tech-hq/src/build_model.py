@@ -15,7 +15,7 @@ import config as C
 from meshkit import MeshBuilder, circle, rounded_rect_profile, TAU, _unit
 import materials as MAT
 
-NU = 192  # 平面輪廓取樣數
+NU = getattr(C, "PLAN_NU", 192)  # 平面輪廓取樣數
 
 
 # ================================================================ helpers
@@ -201,7 +201,7 @@ def louver_levels():
 
 def strut_levels():
     """外骨骼支撐的落點：(高度, 距玻璃面)。每層樓板；樓層很高時加上樓層中段遮陽板。"""
-    lv = [(k * C.FLOOR_H, C.SLAB_EDGE) for k in range(1, C.FLOORS)]
+    lv = [(k * C.FLOOR_H, C.SLAB_EDGE) for k in range(1, C.FLOORS) if k % getattr(C, "STRUT_EVERY", 1) == 0]
     if C.FLOOR_H > 8:
         lv += [(k * C.FLOOR_H + C.FLOOR_H / 2, 0.32) for k in range(0, C.FLOORS)]
     return sorted(lv)
@@ -275,11 +275,11 @@ def build_main(col):
 
 # ================================================================ B. exoskeleton
 def build_exoskeleton(col, rib):
-    prof = rounded_rect_profile(C.RIB_THICK, C.RIB_WIDTH, n=5.0, seg=32)
+    prof = rounded_rect_profile(C.RIB_THICK, C.RIB_WIDTH, n=5.0, seg=getattr(C, "RIB_PROF_SEG", 32))
     trim_prof = []
     for side in (-1, 1):
         cc = np.array([C.RIB_THICK / 2 - 0.02, side * (C.RIB_WIDTH / 2 - 0.25)])
-        a = np.linspace(0, TAU, 10, endpoint=False)
+        a = np.linspace(0, TAU, getattr(C, "RIB_TRIM_SEG", 10), endpoint=False)
         trim_prof.append(cc + 0.075 * np.stack([np.cos(a), np.sin(a)], 1))
     trims = MeshBuilder("Exo_Ribbon_Edge_Trims")
     for name, r in rib.items():

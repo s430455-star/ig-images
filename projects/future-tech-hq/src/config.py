@@ -4,7 +4,9 @@
   預設（正式規格，不可擅自修改）：
     主體 10 層、主體高度 50 m（每層 5 m）；通訊尖塔 68 m；總高 118 m
   HQ_VARIANT=tower500：主體 10 層 × 21.2 m = 212 m；尖塔 288 m；總高 500 m；每層 100 坪
-  HQ_VARIANT=tower800（阿川的園區專案目前版本）：
+  HQ_VARIANT=tower114（阿川的園區專案目前版本）：
+    主體 114 層 × 3.5 m = 399 m；屋頂機房基座 1 m；通訊尖塔 100 m；總高 500 m；每層 100 坪
+  HQ_VARIANT=tower800：
     主體 10 層 × 5 m = 50 m；通訊尖塔 750 m；總高 800 m；
     每層樓地板固定 100 坪（330.58 m²），塔身上下等寬；尖塔重新配置比例（加寬底座、6 層環形平台）
 """
@@ -15,16 +17,19 @@ VARIANT = os.environ.get("HQ_VARIANT", "default")
 PING = 3.305785                    # 1 坪 = 3.305785 m²
 
 # ---------------------------------------------------------------- 正式尺寸
-FLOORS = 10
-FLOOR_H = 21.2 if VARIANT == "tower500" else 5.0
+FLOORS = 114 if VARIANT == "tower114" else 10
+FLOOR_H = {"tower500": 21.2, "tower114": 3.5}.get(VARIANT, 5.0)
 BODY_H = FLOORS * FLOOR_H          # 50.0 / 212.0  主體屋頂結構面
-SPIRE_H = {"tower500": 288.0, "tower800": 750.0}.get(VARIANT, 68.0)
+ROOF_BASE_H = 1.0 if VARIANT == "tower114" else 0.0   # 屋頂機房基座（尖塔從其頂面起算）
+SPIRE_H = {"tower500": 288.0, "tower800": 750.0, "tower114": 100.0}.get(VARIANT, 68.0) + ROOF_BASE_H
 TOTAL_H = BODY_H + SPIRE_H         # 118 / 500 / 800 地面至尖塔頂
-UNIFORM_100 = VARIANT in ("tower500", "tower800")
+UNIFORM_100 = VARIANT in ("tower500", "tower800", "tower114")
 if VARIANT == "tower500":
     assert abs(TOTAL_H - 500.0) < 1e-9
 elif VARIANT == "tower800":
     assert abs(BODY_H - 50.0) < 1e-9 and abs(TOTAL_H - 800.0) < 1e-9
+elif VARIANT == "tower114":
+    assert abs(BODY_H - 399.0) < 1e-9 and abs(TOTAL_H - 500.0) < 1e-9
 else:
     assert abs(BODY_H - 50.0) < 1e-9 and abs(TOTAL_H - 118.0) < 1e-9
 
@@ -68,6 +73,13 @@ if VARIANT == "tower500":
     RIB_OFF_TOP, RIB_OFF_BASE, RIB_BULGE, RIB_SPLIT = 2.6, 4.0, 5.0, 1.1
     RIB_SAMPLES = 1600
     RIB_TAPER_W = 0.012
+if VARIANT == "tower114":
+    RIB_TURNS, RIB_WIDTH, RIB_THICK = 4.25, 4.4, 1.15
+    RIB_OFF_TOP, RIB_OFF_BASE, RIB_BULGE, RIB_SPLIT = 2.6, 4.2, 5.5, 1.15
+    RIB_SAMPLES = 1900
+    RIB_TAPER_W = 0.0065
+    RIB_PROF_SEG, RIB_TRIM_SEG = 20, 6
+    PLAN_NU = 112                  # 網頁版：平面取樣減量
 # 4 條螺旋：兩條順時針、兩條逆時針；第一組在正面 (θ=-90°) 中段交叉
 _k = RIB_TURNS * 360.0
 _tc = 0.5
@@ -89,7 +101,7 @@ SPIRE_BASE_Z = DRUM_TOP + DECK_T   # 55.6 尖塔框架落點
 
 # ---------------------------------------------------------------- 通訊尖塔（自屋頂起算 SPIRE_H）
 SPIRE_SK = SPIRE_H / 68.0          # 高度比例（預設 1）
-SPIRE_SW = {"tower500": 1.5, "tower800": 2.1}.get(VARIANT, 1.0)   # 桁架寬度比例
+SPIRE_SW = {"tower500": 1.5, "tower800": 2.1, "tower114": 1.25}.get(VARIANT, 1.0)   # 桁架寬度比例
 SPIRE_TOP_Z = TOTAL_H              # 118.0 / 500.0
 SPIRE_FOOT_HW = 6.0                # 尖塔底部框架半寬
 SPIRE_WAIST_Z = BODY_H + 18.0 * SPIRE_SK
@@ -118,8 +130,9 @@ if VARIANT == "tower800":
     SPIRE_DISH_Z = [265.0, 365.0, 465.0, 555.0, 630.0]
 
 # ---------------------------------------------------------------- 斜向落地支撐腳的頂點
-LEG_TOP_Z = FLOOR_H if VARIANT == "tower500" else 10.0
-LEG_MID_Z = FLOOR_H / 2 if VARIANT == "tower500" else 5.0
+LEG_TOP_Z = {"tower500": FLOOR_H, "tower114": 3 * FLOOR_H}.get(VARIANT, 10.0)
+LEG_MID_Z = {"tower500": FLOOR_H / 2, "tower114": 1.5 * FLOOR_H}.get(VARIANT, 5.0)
+STRUT_EVERY = 3 if VARIANT == "tower114" else 1   # 外骨骼支撐每幾層一組
 
 
 def lerp(a, b, t):

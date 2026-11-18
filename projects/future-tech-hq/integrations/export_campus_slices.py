@@ -26,7 +26,7 @@ import bmesh  # noqa: E402  (需在 bpy 之後匯入)
 import build_model  # noqa: E402
 import config as C  # noqa: E402
 
-TAG = C.VARIANT.replace("tower", "")   # 500 / 800
+TAG = C.VARIANT.replace("tower", "")   # 500 / 800 / 114
 
 SLICE_COLS = ("A_Main_Building", "B_Exoskeleton")
 OTHER_COLS = ("C1_Roof_Crown", "C2_Spire", "D_Base")
@@ -90,22 +90,39 @@ def main(out):
     col = bpy.data.collections.new("SLICES")
     bpy.context.scene.collection.children.link(col)
     FH = C.FLOOR_H
-    bounds = [-1e9] + [k * FH - 0.4 for k in range(1, C.FLOORS)] + [1e9]
-    floors = {i: [] for i in range(C.FLOORS)}
+    NS = min(C.FLOORS, 10)            # 可展開的部門樓層（1F–10F）；其餘樓層合成固定的上部塔身
+    bounds = [-1e9] + [k * FH - 0.4 for k in range(1, NS)] + [NS * FH - 0.4 if C.FLOORS > NS else 1e9]
+    floors = {i: [] for i in range(NS)}
+    upper = []
     for cname in SLICE_COLS:
         for ob in list(bpy.data.collections[cname].objects):
             apply_modifiers(ob)
             fill = ob.name.startswith(FILL)
-            for i in range(C.FLOORS):
+            for i in range(NS):
                 s = slice_object(ob, bounds[i], bounds[i + 1], f"F{i:02d}__{ob.name}", fill)
                 if s:
                     floors[i].append(s)
+            if C.FLOORS > NS:
+                s = slice_object(ob, NS * FH - 0.4, 1e9, f"UP__{ob.name}", fill)
+                if s:
+                    upper.append(s)
             bpy.data.objects.remove(ob, do_unlink=True)
     others = [o for c in OTHER_COLS for o in bpy.data.collections[c].objects if o.name != "Base_Site_Paving"]
-    half = C.FLOORS // 2
+    half = NS // 2
     export([o for i in range(half) for o in floors[i]], os.path.join(out, f"future-hq-{TAG}-a.gltf.json"))
-    export([o for i in range(half, C.FLOORS) for o in floors[i]], os.path.join(out, f"future-hq-{TAG}-b.gltf.json"))
+    export([o for i in range(half, NS) for o in floors[i]], os.path.join(out, f"future-hq-{TAG}-b.gltf.json"))
     export(others, os.path.join(out, f"future-hq-{TAG}-c.gltf.json"))
+    # 上部塔身：依頂點數分檔（每檔約 < 14 MB）
+    chunks, cur, n = [], [], 0
+    for o in sorted(upper, key=lambda o: -len(o.data.vertices)):
+        v = len(o.data.vertices)
+        if cur and n + v > 150000:
+            chunks.append(cur); cur, n = [], 0
+        cur.append(o); n += v
+    if cur:
+        chunks.append(cur)
+    for k, ch in enumerate(chunks):
+        export(ch, os.path.join(out, f"future-hq-{TAG}-u{k}.gltf.json"))
 
 
 if __name__ == "__main__":

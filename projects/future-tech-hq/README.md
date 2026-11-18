@@ -163,3 +163,12 @@ HQ_VARIANT=tower500 ../../.venv-blender/bin/python integrations/export_campus_sl
 HQ_VARIANT=tower800 ../../.venv-blender/bin/python integrations/export_campus_slices.py <輸出資料夾>
 ```
 輸出 `future-hq-800-a/b/c.gltf.json`；檢查報告在 `variants/tower800/geometry_report.json`，預覽圖 `variants/tower800/preview.png`。
+
+## 500 m／114 層園區版本（HQ_VARIANT=tower114，園區頁面目前使用）
+
+114 層 × 3.5 m（主體 399 m）＋屋頂機房基座 1 m＋通訊尖塔 100 m＝總高 500 m，每層樓地板 100 坪（塔身上下等寬）。
+螺旋外骨骼繞 4.25 圈（34 處交錯），外骨骼支撐每 3 層一組；網頁版降低曲面取樣（約 61 萬頂點）。
+```bash
+HQ_VARIANT=tower114 ../../.venv-blender/bin/python integrations/export_campus_slices.py <輸出資料夾>
+```
+輸出 `future-hq-114-a/b`（1F–10F 可展開切片）、`-c`（屋頂、尖塔、基座）、`-u0…u4`（11F–114F 固定塔身）。
