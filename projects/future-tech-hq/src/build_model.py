@@ -497,7 +497,7 @@ def build_roof_and_spire(col_roof, col_spire):
             rings.tube(d * (ro + 0.2) + [0, 0, z - 0.8], d * (ro + 0.45) + [0, 0, z - 0.8], 0.05, seg=6)
             rings.tube(d * (ro + 0.2) + [0, 0, z - 2.4], d * (ro + 0.45) + [0, 0, z - 2.4], 0.05, seg=6)
     # 微波碟型天線
-    for z in (C.BODY_H + 34.5 * SK, C.BODY_H + 45.0 * SK):
+    for z in C.SPIRE_DISH_Z:
         for a in (0.3, 2.4, 4.5):
             d = np.array([math.cos(a), math.sin(a), 0])
             base = d * (hw(z) * 1.25) + [0, 0, z]

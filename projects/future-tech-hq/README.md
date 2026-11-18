@@ -154,3 +154,12 @@ HQ_VARIANT=tower500 ../../.venv-blender/bin/python -c "import sys;sys.path.inser
 HQ_VARIANT=tower500 ../../.venv-blender/bin/python integrations/export_campus_slices.py <輸出資料夾>
 ```
 園區頁面的整合程式：`integrations/hq-swap.js`（每個樓層切片掛在原本的樓層群組下，展開樓層時一起滑出）。
+
+## 800 m 園區版本（HQ_VARIANT=tower800，園區頁面目前使用）
+
+10 層 × 5 m（主體 50 m）、通訊尖塔 750 m、總高 800 m，每層樓地板 100 坪（塔身上下等寬）。
+750 m 尖塔重新配置比例：底座框架貼滿屋頂、桁架 14＋72 段、6 層環形平台由 215 m 到 665 m 遞減、5 組微波碟型天線。
+```bash
+HQ_VARIANT=tower800 ../../.venv-blender/bin/python integrations/export_campus_slices.py <輸出資料夾>
+```
+輸出 `future-hq-800-a/b/c.gltf.json`；檢查報告在 `variants/tower800/geometry_report.json`，預覽圖 `variants/tower800/preview.png`。

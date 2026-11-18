@@ -1,12 +1,12 @@
-"""把 500 m 版本（HQ_VARIANT=tower500）切成 10 個樓層切片，匯出給園區頁面使用的 glTF JSON。
+"""把園區版本（HQ_VARIANT=tower800 或 tower500）切成 10 個樓層切片，匯出給園區頁面使用的 glTF JSON。
 
 用法（在 projects/future-tech-hq 底下）：
-  HQ_VARIANT=tower500 python integrations/export_campus_slices.py <輸出資料夾>
+  HQ_VARIANT=tower800 python integrations/export_campus_slices.py <輸出資料夾>
 
 輸出（每個檔案 < 16 MB，可直接當 artifact 的 .json 檔發布）：
-  future-hq-500-a.gltf.json  1F–5F 切片（物件名稱 F00__… ~ F04__…）
-  future-hq-500-b.gltf.json  6F–10F 切片（F05__… ~ F09__…）
-  future-hq-500-c.gltf.json  屋頂冠部、通訊尖塔、基座（原名）
+  future-hq-{tag}-a.gltf.json  1F–5F 切片（物件名稱 F00__… ~ F04__…）
+  future-hq-{tag}-b.gltf.json  6F–10F 切片（F05__… ~ F09__…）
+  future-hq-{tag}-c.gltf.json  屋頂冠部、通訊尖塔、基座（原名）
 
 切片規則：第 k 層 = 高度 [k·FH − 0.4, (k+1)·FH − 0.4]，樓板跟著它上方的樓層；
 外骨骼切開處自動封面，樓層滑出時看不到空心斷面。
@@ -18,13 +18,15 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "src"))
-os.environ.setdefault("HQ_VARIANT", "tower500")
+os.environ.setdefault("HQ_VARIANT", "tower800")
 
 import bpy  # noqa: E402
 import bmesh  # noqa: E402  (需在 bpy 之後匯入)
 
 import build_model  # noqa: E402
 import config as C  # noqa: E402
+
+TAG = C.VARIANT.replace("tower", "")   # 500 / 800
 
 SLICE_COLS = ("A_Main_Building", "B_Exoskeleton")
 OTHER_COLS = ("C1_Roof_Crown", "C2_Spire", "D_Base")
@@ -101,9 +103,9 @@ def main(out):
             bpy.data.objects.remove(ob, do_unlink=True)
     others = [o for c in OTHER_COLS for o in bpy.data.collections[c].objects if o.name != "Base_Site_Paving"]
     half = C.FLOORS // 2
-    export([o for i in range(half) for o in floors[i]], os.path.join(out, "future-hq-500-a.gltf.json"))
-    export([o for i in range(half, C.FLOORS) for o in floors[i]], os.path.join(out, "future-hq-500-b.gltf.json"))
-    export(others, os.path.join(out, "future-hq-500-c.gltf.json"))
+    export([o for i in range(half) for o in floors[i]], os.path.join(out, f"future-hq-{TAG}-a.gltf.json"))
+    export([o for i in range(half, C.FLOORS) for o in floors[i]], os.path.join(out, f"future-hq-{TAG}-b.gltf.json"))
+    export(others, os.path.join(out, f"future-hq-{TAG}-c.gltf.json"))
 
 
 if __name__ == "__main__":

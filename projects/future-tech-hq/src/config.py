@@ -3,9 +3,10 @@
 兩種版本（以環境變數 HQ_VARIANT 選擇）：
   預設（正式規格，不可擅自修改）：
     主體 10 層、主體高度 50 m（每層 5 m）；通訊尖塔 68 m；總高 118 m
-  HQ_VARIANT=tower500（阿川的園區專案版本）：
-    主體 10 層、每層 21.2 m、主體 212 m；尖塔 288 m；總高 500 m；
-    每層樓地板固定 100 坪（330.58 m²），塔身上下等寬
+  HQ_VARIANT=tower500：主體 10 層 × 21.2 m = 212 m；尖塔 288 m；總高 500 m；每層 100 坪
+  HQ_VARIANT=tower800（阿川的園區專案目前版本）：
+    主體 10 層 × 5 m = 50 m；通訊尖塔 750 m；總高 800 m；
+    每層樓地板固定 100 坪（330.58 m²），塔身上下等寬；尖塔重新配置比例（加寬底座、6 層環形平台）
 """
 import math
 import os
@@ -17,10 +18,13 @@ PING = 3.305785                    # 1 坪 = 3.305785 m²
 FLOORS = 10
 FLOOR_H = 21.2 if VARIANT == "tower500" else 5.0
 BODY_H = FLOORS * FLOOR_H          # 50.0 / 212.0  主體屋頂結構面
-SPIRE_H = 288.0 if VARIANT == "tower500" else 68.0
-TOTAL_H = BODY_H + SPIRE_H         # 118.0 / 500.0 地面至尖塔頂
+SPIRE_H = {"tower500": 288.0, "tower800": 750.0}.get(VARIANT, 68.0)
+TOTAL_H = BODY_H + SPIRE_H         # 118 / 500 / 800 地面至尖塔頂
+UNIFORM_100 = VARIANT in ("tower500", "tower800")
 if VARIANT == "tower500":
     assert abs(TOTAL_H - 500.0) < 1e-9
+elif VARIANT == "tower800":
+    assert abs(BODY_H - 50.0) < 1e-9 and abs(TOTAL_H - 800.0) < 1e-9
 else:
     assert abs(BODY_H - 50.0) < 1e-9 and abs(TOTAL_H - 118.0) < 1e-9
 
@@ -34,7 +38,7 @@ PODIUM_TOP = 1.0                   # 基座頂（大廳地坪）
 PLAN_A0, PLAN_B0 = 15.0, 12.0      # z=0 半軸（寬 30 m × 深 24 m）
 PLAN_A1, PLAN_B1 = 11.0, 9.0       # z=50 半軸（寬 22 m × 深 18 m）
 PLAN_N = 3.0                       # 超橢圓指數（>2 = 圓角矩形）
-if VARIANT == "tower500":
+if UNIFORM_100:
     # 超橢圓面積 = 4ab·Γ(1+1/n)²/Γ(1+2/n)；n=3、a/b=1.25 → 每層 100 坪
     _k_area = 4 * math.gamma(1 + 1 / PLAN_N) ** 2 / math.gamma(1 + 2 / PLAN_N)
     _b = math.sqrt(100 * PING / (_k_area * 1.25))
@@ -85,7 +89,7 @@ SPIRE_BASE_Z = DRUM_TOP + DECK_T   # 55.6 尖塔框架落點
 
 # ---------------------------------------------------------------- 通訊尖塔（自屋頂起算 SPIRE_H）
 SPIRE_SK = SPIRE_H / 68.0          # 高度比例（預設 1）
-SPIRE_SW = 1.5 if VARIANT == "tower500" else 1.0   # 桁架寬度比例
+SPIRE_SW = {"tower500": 1.5, "tower800": 2.1}.get(VARIANT, 1.0)   # 桁架寬度比例
 SPIRE_TOP_Z = TOTAL_H              # 118.0 / 500.0
 SPIRE_FOOT_HW = 6.0                # 尖塔底部框架半寬
 SPIRE_WAIST_Z = BODY_H + 18.0 * SPIRE_SK
@@ -101,6 +105,17 @@ SPIRE_RINGS = [  # (z, 外半徑, 天線板數)
     (BODY_H + 40.5 * SPIRE_SK, 3.5 * SPIRE_SW, 14),
     (BODY_H + 49.5 * SPIRE_SK, 2.5 * SPIRE_SW, 10),
 ]
+SPIRE_DISH_Z = [BODY_H + 34.5 * SPIRE_SK, BODY_H + 45.0 * SPIRE_SK]
+if VARIANT == "tower800":
+    # 750 m 尖塔：不能單純拉長 → 底座加寬貼滿屋頂、腰部提高、桁架分段加密、6 層環形平台遞減
+    SPIRE_FOOT_HW = 6.6
+    SPIRE_WAIST_Z, SPIRE_WAIST_HW = 215.0, 3.9
+    SPIRE_MAST_TOP_Z, SPIRE_MAST_TOP_HW = 700.0, 1.6
+    SPIRE_POLE_TOP_Z = 784.0
+    SPIRE_NSEC_BASE, SPIRE_NSEC_MAST = 14, 72
+    SPIRE_RINGS = [(215.0, 11.0, 28), (315.0, 9.4, 24), (415.0, 7.8, 22),
+                   (510.0, 6.4, 18), (595.0, 5.2, 16), (665.0, 4.0, 12)]
+    SPIRE_DISH_Z = [265.0, 365.0, 465.0, 555.0, 630.0]
 
 # ---------------------------------------------------------------- 斜向落地支撐腳的頂點
 LEG_TOP_Z = FLOOR_H if VARIANT == "tower500" else 10.0

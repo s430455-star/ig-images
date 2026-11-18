@@ -1,20 +1,20 @@
 /* =====================================================================
-   hq-swap.js — v2 主要大樓：FUTURE TECHNOLOGY HEADQUARTERS 500 m 版
-   規格：10 層、每層 21.2 m（主體 212 m）、通訊尖塔 288 m、總高 500 m、每層樓地板 100 坪
-   • 模型：Blender Python 程式化建模，切成 10 個樓層切片（models/future-hq-500-a/b/c.gltf.json）
-   • 比例：場景 1 單位 ≈ 1.67 m → 縮放 0.6；index.html 的樓層高度 H 已改為 12.72（= 21.2 m）
+   hq-swap.js — v3 主要大樓：FUTURE TECHNOLOGY HEADQUARTERS 800 m 版
+   規格：10 層、每層 5 m（主體 50 m）、通訊尖塔 750 m、總高 800 m、每層樓地板 100 坪
+   • 模型：Blender Python 程式化建模，切成 10 個樓層切片（models/future-hq-800-a/b/c.gltf.json）
+   • 比例：場景 1 單位 ≈ 1.67 m → 縮放 0.6；每層 H=3（= 5 m），與原本樓層一致
    • 每個樓層切片掛在原本的樓層群組底下，所以點樓層「展開」時，滑出來的就是新大樓那一層
      （玻璃帷幕、窗框、結構柱、白色螺旋外骨骼都跟著出來），室內、員工、對話照舊
    • 原本程式產生的大樓外觀全部隱藏；原本的玻璃保留但不畫出來，點大樓選樓層照常
-   • 「視角置中」改成看得到整棟 500 m 大樓；遠景霧依鏡頭距離自動調整
+   • 「視角置中」改成看得到整棟 800 m 大樓；遠景霧依鏡頭距離自動調整
    API：HQSWAP.ready / HQSWAP.home()
    ===================================================================== */
 (function(){
 'use strict';
 const S={ready:false,parts:0};
-const SCALE=0.6, FILES=['models/future-hq-500-a.gltf.json','models/future-hq-500-b.gltf.json','models/future-hq-500-c.gltf.json'];
+const SCALE=0.6, FILES=['models/future-hq-800-a.gltf.json','models/future-hq-800-b.gltf.json','models/future-hq-800-c.gltf.json'];
 const SKIP=/^(Base_Podium|Base_Metal_Trim|Base_Entrance_)/;         // 園區已有入口廣場
-const HOME_NEW={t:[0,148,0],c:[290,165,388]};                         // 看得到整棟（總高 300 單位）
+const HOME_NEW={t:[0,236,0],c:[448,262,600]};                         // 看得到整棟（總高 480 單位）
 const wait=f=>{const c=window.__ct;if(c&&c.scene&&c.camera&&window.THREE&&THREE.GLTFLoader)f(c);else setTimeout(()=>wait(f),400);};
 let haze=null,floors=[],roof=null,H=12.72,N=10,oldRoofKids=[],ribbonMats=[],glassAll=[],floorSlices={},base=null;
 const RIB_DAY=new THREE.Color(0x8f98a3),RIB_NIGHT=new THREE.Color(0xd3d9e0);
@@ -79,6 +79,11 @@ function onPart(gltf,c){
   S.parts++;
 }
 let lastEntered=-2,tw=null;
+/* 遠景霧依鏡頭距離退遠（城市模組每格會重設霧，所以在它之後再調整一次） */
+function fogFit(c){const f=c.scene.fog;if(!f)return;const d=c.camera.position.distanceTo(c.controls.target);
+  f.near=Math.max(f.near,d*1.25);f.far=Math.max(f.far,d*3.2+300);}
+function hookCity(c){if(!window.HQC||!HQC.update||HQC.update.__hqswap)return;const f0=HQC.update;
+  const w=function(){const r=f0.apply(this,arguments);fogFit(c);return r;};w.__hqswap=1;HQC.update=w;}
 function flyHome(c){
   if(c.entered&&c.entered()>=0)c.exitFloor();
   const from=c.camera.position.clone(),ft=c.controls.target.clone(),t0=performance.now(),dur=matchMedia('(prefers-reduced-motion: reduce)').matches?1:1600;
@@ -89,7 +94,7 @@ function flyHome(c){
     tw=u<1?requestAnimationFrame(step):null;};tw=requestAnimationFrame(step);}
 function mountUI(c){
   const tryMount=()=>{const home=document.getElementById('btnHome');if(!home){setTimeout(tryMount,400);return;}
-    home.onclick=()=>flyHome(c);home.title='回到看得到整棟 500 m 大樓的視角';};
+    home.onclick=()=>flyHome(c);home.title='回到看得到整棟 800 m 大樓的視角';};
   tryMount();}
 function loop(c){
   hideOld();
@@ -107,7 +112,7 @@ function loop(c){
   if(!haze){const sf=c.scene.getObjectByName('scifi');haze=[];if(sf)sf.traverse(o=>{const u=o.material&&o.material.uniforms;if(u&&u.uK&&u.uDay){haze.push([u.uK,u.uK.value]);}});}
   const hk=Math.min(1,Math.max(0,1-(c.camera.position.y-40)/70));haze.forEach(([u,k])=>{u.value=k*hk;});
   // 遠景霧：鏡頭拉遠看整棟時，霧跟著退遠
-  const f=c.scene.fog;if(f){const d=c.camera.position.distanceTo(c.controls.target);f.near=Math.max(95,d*.85);f.far=Math.max(210,d*2.4+250);}
+  fogFit(c);
   if(c.camera.far<6000){c.camera.far=6000;c.camera.updateProjectionMatrix();}
   requestAnimationFrame(()=>loop(c));
 }
@@ -120,7 +125,7 @@ wait(c=>{
 function done(c){
   S.ready=S.parts===FILES.length;
   if(!S.parts)return;
-  loop(c);mountUI(c);
+  hookCity(c);loop(c);mountUI(c);
   if(!(c.entered&&c.entered()>=0))setTimeout(()=>flyHome(c),300);
   if(window.HQSTILL&&HQSTILL.refresh)setTimeout(()=>HQSTILL.refresh(),500);
 }
