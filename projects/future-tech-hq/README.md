@@ -180,3 +180,12 @@ HQ_VARIANT=tower114 ../../.venv-blender/bin/python integrations/export_campus_sl
 ```bash
 HQ_VARIANT=tower200 ../../.venv-blender/bin/python integrations/export_campus_slices.py <輸出資料夾>
 ```
+
+## 80 m 園區版本（HQ_VARIANT=tower80，園區頁面目前使用）
+
+10 層 × 3 m（主體 30 m）＋通訊尖塔 50 m＝總高 80 m，每層樓地板 100 坪。外骨骼支撐每 2 層一組。
+園區頁面選擇樓層時切換成「獨立辦公室畫面」：只留下該層辦公室，其他樓層、屋頂、尖塔、電梯井暫時隱藏，
+該層外骨骼與結構柱也收起；離開樓層後整棟恢復（`integrations/hq-swap.js` 的 `isolate()`）。
+```bash
+HQ_VARIANT=tower80 ../../.venv-blender/bin/python integrations/export_campus_slices.py <輸出資料夾>
+```
