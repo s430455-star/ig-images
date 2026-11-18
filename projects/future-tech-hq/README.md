@@ -172,3 +172,11 @@ HQ_VARIANT=tower800 ../../.venv-blender/bin/python integrations/export_campus_sl
 HQ_VARIANT=tower114 ../../.venv-blender/bin/python integrations/export_campus_slices.py <輸出資料夾>
 ```
 輸出 `future-hq-114-a/b`（1F–10F 可展開切片）、`-c`（屋頂、尖塔、基座）、`-u0…u4`（11F–114F 固定塔身）。
+
+## 200 m 園區版本（HQ_VARIANT=tower200，園區頁面目前使用）
+
+10 層 × 15 m（主體 150 m）＋通訊尖塔 50 m＝總高 200 m，每層樓地板 100 坪（塔身上下等寬）。
+螺旋外骨骼繞 1.4 圈（10 處交錯；1.5 圈會讓順逆兩組螺旋的落地點重疊）。挑高樓層每層 3 道遮陽板、樓層中段加外骨骼支撐。
+```bash
+HQ_VARIANT=tower200 ../../.venv-blender/bin/python integrations/export_campus_slices.py <輸出資料夾>
+```

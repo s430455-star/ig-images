@@ -195,7 +195,7 @@ def build_base_legs(col, rib):
 def louver_levels():
     """樓層中段水平遮陽板高度：每層 n 等分（5 m 樓層 → 中段 1 道；21.2 m 樓層 → 每 3.5 m 1 道）。"""
     n = max(2, 2 * round(C.FLOOR_H / 8.4))
-    k0 = 0 if C.VARIANT == "tower500" else 1
+    k0 = 0 if C.VARIANT in ("tower500", "tower200") else 1
     return [k * C.FLOOR_H + j * C.FLOOR_H / n for k in range(k0, C.FLOORS) for j in range(1, n)]
 
 

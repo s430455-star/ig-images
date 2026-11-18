@@ -4,7 +4,9 @@
   預設（正式規格，不可擅自修改）：
     主體 10 層、主體高度 50 m（每層 5 m）；通訊尖塔 68 m；總高 118 m
   HQ_VARIANT=tower500：主體 10 層 × 21.2 m = 212 m；尖塔 288 m；總高 500 m；每層 100 坪
-  HQ_VARIANT=tower114（阿川的園區專案目前版本）：
+  HQ_VARIANT=tower200（阿川的園區專案目前版本）：
+    主體 10 層 × 15 m = 150 m；通訊尖塔 50 m；總高 200 m；每層 100 坪
+  HQ_VARIANT=tower114：
     主體 114 層 × 3.5 m = 399 m；屋頂機房基座 1 m；通訊尖塔 100 m；總高 500 m；每層 100 坪
   HQ_VARIANT=tower800：
     主體 10 層 × 5 m = 50 m；通訊尖塔 750 m；總高 800 m；
@@ -18,16 +20,19 @@ PING = 3.305785                    # 1 坪 = 3.305785 m²
 
 # ---------------------------------------------------------------- 正式尺寸
 FLOORS = 114 if VARIANT == "tower114" else 10
-FLOOR_H = {"tower500": 21.2, "tower114": 3.5}.get(VARIANT, 5.0)
+FLOOR_H = {"tower500": 21.2, "tower114": 3.5, "tower200": 15.0}.get(VARIANT, 5.0)
 BODY_H = FLOORS * FLOOR_H          # 50.0 / 212.0  主體屋頂結構面
 ROOF_BASE_H = 1.0 if VARIANT == "tower114" else 0.0   # 屋頂機房基座（尖塔從其頂面起算）
-SPIRE_H = {"tower500": 288.0, "tower800": 750.0, "tower114": 100.0}.get(VARIANT, 68.0) + ROOF_BASE_H
+SPIRE_H = {"tower500": 288.0, "tower800": 750.0, "tower114": 100.0, "tower200": 50.0}.get(VARIANT, 68.0) + ROOF_BASE_H
 TOTAL_H = BODY_H + SPIRE_H         # 118 / 500 / 800 地面至尖塔頂
-UNIFORM_100 = VARIANT in ("tower500", "tower800", "tower114")
+UNIFORM_100 = VARIANT in ("tower500", "tower800", "tower114", "tower200")
+TALL_FLOORS = FLOOR_H > 8          # 挑高樓層：樓層中段加遮陽板與外骨骼支撐
 if VARIANT == "tower500":
     assert abs(TOTAL_H - 500.0) < 1e-9
 elif VARIANT == "tower800":
     assert abs(BODY_H - 50.0) < 1e-9 and abs(TOTAL_H - 800.0) < 1e-9
+elif VARIANT == "tower200":
+    assert abs(BODY_H - 150.0) < 1e-9 and abs(TOTAL_H - 200.0) < 1e-9
 elif VARIANT == "tower114":
     assert abs(BODY_H - 399.0) < 1e-9 and abs(TOTAL_H - 500.0) < 1e-9
 else:
@@ -73,6 +78,11 @@ if VARIANT == "tower500":
     RIB_OFF_TOP, RIB_OFF_BASE, RIB_BULGE, RIB_SPLIT = 2.6, 4.0, 5.0, 1.1
     RIB_SAMPLES = 1600
     RIB_TAPER_W = 0.012
+if VARIANT == "tower200":
+    RIB_TURNS, RIB_WIDTH, RIB_THICK = 1.4, 3.6, 0.95
+    RIB_OFF_TOP, RIB_OFF_BASE, RIB_BULGE, RIB_SPLIT = 2.5, 3.8, 4.6, 0.95
+    RIB_SAMPLES = 1000
+    RIB_TAPER_W = 0.02
 if VARIANT == "tower114":
     RIB_TURNS, RIB_WIDTH, RIB_THICK = 4.25, 4.4, 1.15
     RIB_OFF_TOP, RIB_OFF_BASE, RIB_BULGE, RIB_SPLIT = 2.6, 4.2, 5.5, 1.15
@@ -130,8 +140,8 @@ if VARIANT == "tower800":
     SPIRE_DISH_Z = [265.0, 365.0, 465.0, 555.0, 630.0]
 
 # ---------------------------------------------------------------- 斜向落地支撐腳的頂點
-LEG_TOP_Z = {"tower500": FLOOR_H, "tower114": 3 * FLOOR_H}.get(VARIANT, 10.0)
-LEG_MID_Z = {"tower500": FLOOR_H / 2, "tower114": 1.5 * FLOOR_H}.get(VARIANT, 5.0)
+LEG_TOP_Z = {"tower500": FLOOR_H, "tower200": FLOOR_H, "tower114": 3 * FLOOR_H}.get(VARIANT, 10.0)
+LEG_MID_Z = {"tower500": FLOOR_H / 2, "tower200": FLOOR_H / 2, "tower114": 1.5 * FLOOR_H}.get(VARIANT, 5.0)
 STRUT_EVERY = 3 if VARIANT == "tower114" else 1   # 外骨骼支撐每幾層一組
 
 

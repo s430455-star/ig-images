@@ -1,0 +1,42 @@
+{
+  "dimensions": {
+    "total_height_m": 200.0,
+    "body_roof_level_m": 150.0,
+    "spire_height_above_roof_m": 50.0,
+    "floors": 10,
+    "floor_height_m": 15.0,
+    "spec_ok": true,
+    "floor_area_ping_1F": 100.0,
+    "floor_area_ping_10F": 100.0,
+    "plan_width_x_m_at_ground": 22.73,
+    "plan_depth_y_m_at_ground": 18.4
+  },
+  "exoskeleton": {
+    "ribbons": 4,
+    "min_clearance_to_glass_m": 1.381,
+    "min_clearance_to_column_face_m": 0.601,
+    "crossings": 10,
+    "min_surface_gap_between_ribbons_m": {
+      "Exo_Ribbon_A1~Exo_Ribbon_A2": 26.27,
+      "Exo_Ribbon_A1~Exo_Ribbon_B1": 0.856,
+      "Exo_Ribbon_A1~Exo_Ribbon_B2": 0.854,
+      "Exo_Ribbon_A2~Exo_Ribbon_B1": 0.854,
+      "Exo_Ribbon_A2~Exo_Ribbon_B2": 0.856,
+      "Exo_Ribbon_B1~Exo_Ribbon_B2": 22.52
+    }
+  },
+  "intersections": {
+    "ribbon_vs_ribbon": 0,
+    "ribbon_vs_glass": 0,
+    "ribbon_vs_columns_mullions": 0,
+    "ribbon_vs_base_legs": 0,
+    "struts_vs_glass": 0,
+    "base_legs_vs_glass_lobby": 0,
+    "clean": true
+  },
+  "mesh_stats": {
+    "objects": 36,
+    "vertices": 393188,
+    "faces": 376872
+  }
+}

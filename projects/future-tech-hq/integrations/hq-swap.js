@@ -1,21 +1,20 @@
 /* =====================================================================
-   hq-swap.js — v4 主要大樓：FUTURE TECHNOLOGY HEADQUARTERS 500 m／114 層版
-   規格：114 層、每層 3.5 m（主體 399 m）、屋頂機房基座 1 m＋通訊尖塔 100 m、總高 500 m、每層樓地板 100 坪
-   • 1F–10F（各部門）是可展開的樓層切片；11F–114F 合成固定的上部塔身（u0–u4 檔）
-   • 模型：Blender Python 程式化建模，切成 10 個樓層切片（models/future-hq-114-*.gltf.json）
-   • 比例：場景 1 單位 ≈ 1.67 m → 縮放 0.6；index.html 的樓層高度 H 改為 2.1（= 3.5 m）
+   hq-swap.js — v5 主要大樓：FUTURE TECHNOLOGY HEADQUARTERS 200 m 版
+   規格：10 層、每層 15 m（主體 150 m）、通訊尖塔 50 m、總高 200 m、每層樓地板 100 坪
+   • 模型：Blender Python 程式化建模，切成 10 個樓層切片（models/future-hq-200-a/b/c.gltf.json）
+   • 比例：場景 1 單位 ≈ 1.67 m → 縮放 0.6；index.html 的樓層高度 H 改為 9（= 15 m）
    • 每個樓層切片掛在原本的樓層群組底下，所以點樓層「展開」時，滑出來的就是新大樓那一層
      （玻璃帷幕、窗框、結構柱、白色螺旋外骨骼都跟著出來），室內、員工、對話照舊
    • 原本程式產生的大樓外觀全部隱藏；原本的玻璃保留但不畫出來，點大樓選樓層照常
-   • 「視角置中」改成看得到整棟 500 m 大樓；遠景霧依鏡頭距離自動調整
+   • 「視角置中」改成看得到整棟 200 m 大樓；遠景霧依鏡頭距離自動調整
    API：HQSWAP.ready / HQSWAP.home()
    ===================================================================== */
 (function(){
 'use strict';
 const S={ready:false,parts:0};
-const SCALE=0.6, FILES=['models/future-hq-114-a.gltf.json','models/future-hq-114-b.gltf.json','models/future-hq-114-c.gltf.json','models/future-hq-114-u0.gltf.json','models/future-hq-114-u1.gltf.json','models/future-hq-114-u2.gltf.json','models/future-hq-114-u3.gltf.json','models/future-hq-114-u4.gltf.json'];
+const SCALE=0.6, FILES=['models/future-hq-200-a.gltf.json','models/future-hq-200-b.gltf.json','models/future-hq-200-c.gltf.json'];
 const SKIP=/^(Base_Podium|Base_Metal_Trim|Base_Entrance_)/;         // 園區已有入口廣場
-const HOME_NEW={t:[0,148,0],c:[290,165,388]};                         // 看得到整棟（總高 300 單位）
+const HOME_NEW={t:[0,58,0],c:[128,150,172]};                           // 看得到整棟（總高 120 單位）
 const wait=f=>{const c=window.__ct;if(c&&c.scene&&c.camera&&window.THREE&&THREE.GLTFLoader)f(c);else setTimeout(()=>wait(f),400);};
 let haze=null,floors=[],roof=null,H=12.72,N=10,oldRoofKids=[],ribbonMats=[],glassAll=[],floorSlices={},base=null;
 const RIB_DAY=new THREE.Color(0x8f98a3),RIB_NIGHT=new THREE.Color(0xd3d9e0);
@@ -95,7 +94,7 @@ function flyHome(c){
     tw=u<1?requestAnimationFrame(step):null;};tw=requestAnimationFrame(step);}
 function mountUI(c){
   const tryMount=()=>{const home=document.getElementById('btnHome');if(!home){setTimeout(tryMount,400);return;}
-    home.onclick=()=>flyHome(c);home.title='回到看得到整棟 500 m 大樓的視角';};
+    home.onclick=()=>flyHome(c);home.title='回到看得到整棟 200 m 大樓的視角';};
   tryMount();}
 function loop(c){
   hideOld();
