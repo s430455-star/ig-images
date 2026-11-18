@@ -1,23 +1,23 @@
 /* =====================================================================
-   hq-swap.js — v7 主要大樓：FUTURE TECHNOLOGY HEADQUARTERS 200 m 版（由 80 m 版等比例拉高）
-   規格：25 層、每層 3 m（主體 75 m）、通訊尖塔 125 m、總高 200 m、每層樓地板 100 坪
-   • 1F–10F（各部門）是可展開的樓層切片；11F–25F 合成固定的上部塔身
+   hq-swap.js — v8 主要大樓：FUTURE TECHNOLOGY HEADQUARTERS 110 m 版
+   規格：10 層、每層 3 m（主體 30 m）、通訊尖塔 80 m、總高 110 m、每層樓地板 100 坪
+   • 室內（家具、員工、設備）整間等比例縮成 60%（原本依約 5 m 樓層製作 → 3 m 樓層）
    • 選擇樓層進入時：只留下那一層辦公室（獨立畫面），其他樓層、屋頂、尖塔、電梯井暫時隱藏，
      該層的外骨骼與結構柱也收起，辦公室完整露出；離開樓層後整棟恢復
-   • 模型：Blender Python 程式化建模，切成 10 個樓層切片（models/future-hq-200p-*.gltf.json）
+   • 模型：Blender Python 程式化建模，切成 10 個樓層切片（models/future-hq-110-a/b/c.gltf.json）
    • 比例：場景 1 單位 ≈ 1.67 m → 縮放 0.6；index.html 的樓層高度 H 改為 1.8（= 3 m）
    • 每個樓層切片掛在原本的樓層群組底下，所以點樓層「展開」時，滑出來的就是新大樓那一層
      （玻璃帷幕、窗框、結構柱、白色螺旋外骨骼都跟著出來），室內、員工、對話照舊
    • 原本程式產生的大樓外觀全部隱藏；原本的玻璃保留但不畫出來，點大樓選樓層照常
-   • 「視角置中」改成看得到整棟 200 m 大樓；遠景霧依鏡頭距離自動調整
+   • 「視角置中」改成看得到整棟 110 m 大樓；遠景霧依鏡頭距離自動調整
    API：HQSWAP.ready / HQSWAP.home()
    ===================================================================== */
 (function(){
 'use strict';
 const S={ready:false,parts:0};
-const SCALE=0.6, FILES=['models/future-hq-200p-a.gltf.json','models/future-hq-200p-b.gltf.json','models/future-hq-200p-c.gltf.json','models/future-hq-200p-u0.gltf.json','models/future-hq-200p-u1.gltf.json'];
+const SCALE=0.6, FILES=['models/future-hq-110-a.gltf.json','models/future-hq-110-b.gltf.json','models/future-hq-110-c.gltf.json'];
 const SKIP=/^(Base_Podium|Base_Metal_Trim|Base_Entrance_)/;         // 園區已有入口廣場
-const HOME_NEW={t:[0,58,0],c:[128,150,172]};                           // 看得到整棟（總高 120 單位）
+const HOME_NEW={t:[0,30,0],c:[74,66,100]};                           // 看得到整棟（總高 120 單位）
 const wait=f=>{const c=window.__ct;if(c&&c.scene&&c.camera&&window.THREE&&THREE.GLTFLoader)f(c);else setTimeout(()=>wait(f),400);};
 let haze=null,floors=[],roof=null,H=12.72,N=10,oldRoofKids=[],ribbonMats=[],glassAll=[],floorSlices={},base=null;
 const RIB_DAY=new THREE.Color(0x8f98a3),RIB_NIGHT=new THREE.Color(0xd3d9e0);
@@ -84,6 +84,12 @@ function onPart(gltf,c){
 let lastEntered=-2,tw=null,elevParts=null;
 /* 獨立辦公室畫面：進入樓層時只留下那一層 */
 const OPEN_UP=/__(Exo_|Main_Structural_Columns|Main_Vertical_Mullions|Main_Horizontal_Louvers)/;
+const INTERIOR_SCALE=.6;   // 3 m ÷ 5 m
+function scaleInteriors(){floors.forEach(g=>{g.children.forEach(ch=>{
+  if(ch.isGroup&&!(ch.userData&&ch.userData.hqNew)&&ch!==g.userData.deco&&!ch.userData.hqScaled){ch.scale.setScalar(INTERIOR_SCALE);ch.userData.hqScaled=1;
+    // 木地板不縮：鋪滿整個樓層（第一個朝上的平面）
+    const floorMesh=ch.children.find(m=>m.isMesh&&Math.abs(m.rotation.x+Math.PI/2)<1e-3&&m.geometry&&/Shape|Plane/.test(m.geometry.type));
+    if(floorMesh)floorMesh.scale.set(1.12/INTERIOR_SCALE,1.12/INTERIOR_SCALE,1);}});});}
 function isolate(c,e){
   const solo=e>=0;
   floors.forEach((g,i)=>{g.children.forEach(w=>{if(w.userData&&w.userData.hqNew){w.visible=!solo||i===e;
@@ -110,10 +116,10 @@ function flyHome(c){
     tw=u<1?requestAnimationFrame(step):null;};tw=requestAnimationFrame(step);}
 function mountUI(c){
   const tryMount=()=>{const home=document.getElementById('btnHome');if(!home){setTimeout(tryMount,400);return;}
-    home.onclick=()=>flyHome(c);home.title='回到看得到整棟 200 m 大樓的視角';};
+    home.onclick=()=>flyHome(c);home.title='回到看得到整棟 110 m 大樓的視角';};
   tryMount();}
 function loop(c){
-  hideOld();
+  hideOld();scaleInteriors();
   const e=c.entered?c.entered():-1;
   if(e!==lastEntered){
     Object.keys(floorSlices).forEach(k=>{const pf=floorSlices[k],on=+k===e;

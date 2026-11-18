@@ -198,3 +198,11 @@ HQ_VARIANT=tower80 ../../.venv-blender/bin/python integrations/export_campus_sli
 ```bash
 HQ_VARIANT=tower200p ../../.venv-blender/bin/python integrations/export_campus_slices.py <輸出資料夾>
 ```
+
+## 110 m 園區版本（HQ_VARIANT=tower110，園區頁面目前使用）
+
+10 層 × 3 m（主體 30 m）＋通訊尖塔 80 m＝總高 110 m，每層樓地板 100 坪。
+園區頁面的室內（家具、員工、設備）整間等比例縮成 60%（原本依約 5 m 樓層製作），木地板仍鋪滿整層。
+```bash
+HQ_VARIANT=tower110 ../../.venv-blender/bin/python integrations/export_campus_slices.py <輸出資料夾>
+```
