@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Future Technology HQ</title>
+<style>
+  :root {
+    --bg: #eceef1; --panel: rgba(255,255,255,.86); --ink: #1d232b; --muted: #5d6773;
+    --line: rgba(20,30,40,.12); --accent: #2f6fb3; --btn: #ffffff; --btn-on: #1d232b; --btn-on-ink: #fff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #15181c; --panel: rgba(28,32,38,.88); --ink: #e8ecf1; --muted: #9aa4af;
+      --line: rgba(255,255,255,.12); --accent: #7fb2ec; --btn: #232831; --btn-on: #e8ecf1; --btn-on-ink: #15181c;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #15181c; --panel: rgba(28,32,38,.88); --ink: #e8ecf1; --muted: #9aa4af;
+    --line: rgba(255,255,255,.12); --accent: #7fb2ec; --btn: #232831; --btn-on: #e8ecf1; --btn-on-ink: #15181c;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink);
+    font: 14px/1.45 system-ui, -apple-system, "Segoe UI", "Noto Sans TC", "PingFang TC", sans-serif; overflow: hidden; }
+  #app { position: fixed; inset: 0; }
+  canvas { display: block; touch-action: none; }
+  .panel { position: fixed; background: var(--panel); backdrop-filter: blur(10px); border: 1px solid var(--line);
+    border-radius: 12px; padding: 12px 14px; }
+  #info { top: 16px; left: 16px; max-width: 320px; }
+  #info h1 { font-size: 15px; margin: 0 0 4px; letter-spacing: .04em; }
+  #info p { margin: 0; color: var(--muted); font-size: 12.5px; }
+  #info dl { display: grid; grid-template-columns: auto auto; gap: 2px 12px; margin: 8px 0 0; font-size: 12.5px; }
+  #info dt { color: var(--muted); } #info dd { margin: 0; font-variant-numeric: tabular-nums; text-align: right; }
+  #views { bottom: 16px; left: 50%; transform: translateX(-50%); display: flex; flex-wrap: wrap; gap: 6px;
+    justify-content: center; width: min(760px, calc(100vw - 32px)); }
+  button { font: inherit; font-size: 12.5px; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--line);
+    background: var(--btn); color: var(--ink); cursor: pointer; }
+  button.on { background: var(--btn-on); color: var(--btn-on-ink); }
+  #layers { top: 16px; right: 16px; display: flex; flex-direction: column; gap: 6px; }
+  #layers label { display: flex; gap: 6px; align-items: center; font-size: 12.5px; cursor: pointer; }
+  #loading { position: fixed; inset: 0; display: grid; place-items: center; color: var(--muted); pointer-events: none; }
+  @media (max-width: 640px) {
+    #info { max-width: calc(100vw - 32px); right: 16px; padding: 10px 12px; }
+    #info dl { display: none; }
+    #layers { top: auto; bottom: 120px; }
+  }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="loading">載入模型中… <span id="pct"></span></div>
+<div id="info" class="panel">
+  <h1>FUTURE TECHNOLOGY HEADQUARTERS</h1>
+  <p>Blender Python 程式化建模 · 拖曳旋轉 / 滾輪縮放 / 右鍵平移</p>
+  <dl>
+    <dt>主體</dt><dd>10 層 · 50 m</dd>
+    <dt>通訊尖塔</dt><dd>68 m（屋頂起算）</dd>
+    <dt>總高度</dt><dd id="h">118 m</dd>
+    <dt>網格物件</dt><dd id="objs">–</dd>
+  </dl>
+</div>
+<div id="layers" class="panel">
+  <label><input type="checkbox" data-prefix="Exo_" checked> 白色螺旋外骨骼</label>
+  <label><input type="checkbox" data-prefix="Main_Glass" checked> 玻璃帷幕</label>
+  <label><input type="checkbox" data-prefix="Spire_" checked> 通訊尖塔</label>
+  <label><input type="checkbox" id="rotate"> 自動旋轉</label>
+</div>
+<div id="views" class="panel"></div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+} }
+</script>
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
+
+const MODEL_URL = new URLSearchParams(location.search).get("model") || "../model/future_tech_hq.glb";
+
+// 與 Blender 渲染相同的八個固定視角（Blender Z-up → three.js Y-up：(x,y,z) → (x,z,-y)）
+const VIEWS = [
+  ["正面全景", -90, 5.5, 300, 50, 57, null],
+  ["左前 45°", -135, 5.5, 300, 50, 57, null],
+  ["右前 45°", -45, 5.5, 300, 50, 57, null],
+  ["左側面", 180, 5.5, 300, 50, 57, null],
+  ["右側面", 0, 5.5, 300, 50, 57, null],
+  ["正後方", 90, 5.5, 300, 50, 57, null],
+  ["高空俯視 45°", -122, 45, 315, 50, 46, null],
+  ["低角度仰視", -108, 0, 74, 15, 56, 1.6],
+];
+
+const app = document.getElementById("app");
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.toneMapping = THREE.AgXToneMapping;
+renderer.toneMappingExposure = 1.15;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+app.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+scene.environmentIntensity = 0.9;
+
+const camera = new THREE.PerspectiveCamera(30, innerWidth / innerHeight, 0.5, 5000);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.maxPolarAngle = Math.PI * 0.495;
+controls.minDistance = 20; controls.maxDistance = 900;
+
+scene.add(new THREE.HemisphereLight(0xdfe9f7, 0x8a8f96, 0.6));
+const sun = new THREE.DirectionalLight(0xfff6ea, 3.2);
+sun.position.set(-120, 160, 110);
+sun.castShadow = true;
+sun.shadow.mapSize.set(4096, 4096);
+Object.assign(sun.shadow.camera, { left: -130, right: 130, top: 130, bottom: -130, near: 10, far: 600 });
+sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.05;
+scene.add(sun);
+
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(2000, 2000), new THREE.ShadowMaterial({ opacity: 0.22 }));
+ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true;
+scene.add(ground);
+
+function vfovFromLens(mm) { return THREE.MathUtils.radToDeg(2 * Math.atan(12 / mm)); }
+function setView(i, animate = true) {
+  const [, az, el, dist, lens, tz, camZ] = VIEWS[i];
+  const a = THREE.MathUtils.degToRad(az), e = THREE.MathUtils.degToRad(el);
+  const bx = dist * Math.cos(a) * Math.cos(e), by = dist * Math.sin(a) * Math.cos(e);
+  let bz = tz + dist * Math.sin(e);
+  if (camZ !== null) bz = camZ;
+  const to = new THREE.Vector3(bx, bz, -by), target = new THREE.Vector3(0, tz, 0);
+  const fov = vfovFromLens(lens) * (innerWidth / innerHeight < 0.8 ? 1.25 : 1);
+  document.querySelectorAll("#views button").forEach((b, k) => b.classList.toggle("on", k === i));
+  if (!animate) { camera.position.copy(to); controls.target.copy(target); camera.fov = fov; camera.updateProjectionMatrix(); return; }
+  const p0 = camera.position.clone(), t0 = controls.target.clone(), f0 = camera.fov, start = performance.now();
+  (function step(now) {
+    const k = Math.min((now - start) / 900, 1), s = k * k * (3 - 2 * k);
+    camera.position.lerpVectors(p0, to, s); controls.target.lerpVectors(t0, target, s);
+    camera.fov = f0 + (fov - f0) * s; camera.updateProjectionMatrix();
+    if (k < 1) requestAnimationFrame(step);
+  })(start);
+}
+const views = document.getElementById("views");
+VIEWS.forEach((v, i) => { const b = document.createElement("button"); b.textContent = `${i + 1}. ${v[0]}`; b.onclick = () => setView(i); views.appendChild(b); });
+setView(0, false);
+
+const model = new THREE.Group();
+scene.add(model);
+new GLTFLoader().load(MODEL_URL, (gltf) => {
+  let n = 0;
+  gltf.scene.traverse((o) => {
+    if (!o.isMesh) return;
+    n++;
+    o.castShadow = true; o.receiveShadow = true;
+    const m = o.material;
+    if (m && m.name && m.name.includes("Glass")) {
+      // 以反射為主的建築玻璃（避免即時穿透造成的效能負擔）
+      o.material = new THREE.MeshPhysicalMaterial({
+        color: m.name.includes("Lobby") ? 0xa9c3d3 : 0x2a4258, metalness: 0.15, roughness: 0.04,
+        transparent: true, opacity: m.name.includes("Lobby") ? 0.35 : 0.82, envMapIntensity: 1.6,
+        clearcoat: 1, clearcoatRoughness: 0.03, depthWrite: !m.name.includes("Lobby"),
+      });
+      o.castShadow = false;
+    }
+  });
+  model.add(gltf.scene);
+  const box = new THREE.Box3().setFromObject(gltf.scene);
+  document.getElementById("h").textContent = `${box.max.y.toFixed(1)} m`;
+  document.getElementById("objs").textContent = n;
+  document.getElementById("loading").remove();
+}, (e) => { if (e.total) document.getElementById("pct").textContent = Math.round(e.loaded / e.total * 100) + "%"; },
+(err) => { document.getElementById("loading").textContent = "模型載入失敗：" + err.message; });
+
+document.querySelectorAll("#layers input[data-prefix]").forEach((cb) => cb.addEventListener("change", () => {
+  model.traverse((o) => { if (o.isMesh && o.name.startsWith(cb.dataset.prefix)) o.visible = cb.checked; });
+}));
+const rot = document.getElementById("rotate");
+rot.addEventListener("change", () => { controls.autoRotate = rot.checked; controls.autoRotateSpeed = 0.6; });
+
+addEventListener("resize", () => {
+  camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+renderer.setAnimationLoop(() => { controls.update(); renderer.render(scene, camera); });
+</script>
+</body>
+</html>
